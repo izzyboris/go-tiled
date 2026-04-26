@@ -195,6 +195,11 @@ func (r *Renderer) _renderLayer(layer *tiled.Layer) error {
 			}
 
 			pos := r.engine.GetTilePosition(x, y)
+			offset := layer.Tiles[i].Tileset.TileOffset
+			if offset != nil {
+				offsetPt := image.Point{X: offset.X, Y: offset.Y}
+				pos = pos.Bounds().Add(offsetPt)
+			}
 
 			if layer.Opacity < 1 {
 				mask := image.NewUniform(color.Alpha{uint8(layer.Opacity * 255)})
