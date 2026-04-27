@@ -47,6 +47,9 @@ var (
 
 	// ErrOutOfBounds represents an error that the index is out of bounds
 	ErrOutOfBounds = errors.New("tiled/render: index out of bounds")
+
+	// ErrUnsupportedImgFormat represents an error due to an incompatible image
+	ErrUnsupportedImgFormat = errors.New("tiled/render: unsupported image format")
 )
 
 // RendererEngine is the interface implemented by objects that provide rendering engine for Tiled maps.
@@ -93,6 +96,23 @@ func (r *Renderer) open(f string) (io.ReadCloser, error) {
 	return r.fs.Open(filepath.ToSlash(f))
 }
 
+func (r *Renderer) applyTransColor(img image.Image, trans *tiled.HexColor) error {
+	timg, ok := img.(*image.RGBA)
+	if !ok {
+		return ErrUnsupportedImgFormat
+	}
+	r1, g1, b1, _ := trans.RGBA()
+	for i := 0; i < timg.Bounds().Max.X; i++ {
+		for j := 0; j < timg.Bounds().Max.Y; j++ {
+			r2, g2, b2, _ := timg.At(i, j).RGBA()
+			if r1 == r2 && g1 == g2 && b1 == b2 {
+				timg.Set(i, j, color.Transparent)
+			}
+		}
+	}
+	return nil
+}
+
 func (r *Renderer) getTileImage(tile *tiled.LayerTile) (image.Image, error) {
 	timg, ok := r.tileCache[tile.Tileset.FirstGID+tile.ID]
 	if ok {
@@ -111,6 +131,12 @@ func (r *Renderer) getTileImage(tile *tiled.LayerTile) (image.Image, error) {
 				if err != nil {
 					return nil, err
 				}
+				if timg != nil {
+					err = r.applyTransColor(timg, tile.Tileset.Image.Trans)
+					if err != nil {
+						return nil, err
+					}
+				}
 				r.tileCache[tile.Tileset.FirstGID+tile.ID] = timg
 			}
 		}
@@ -122,6 +148,10 @@ func (r *Renderer) getTileImage(tile *tiled.LayerTile) (image.Image, error) {
 		defer sf.Close()
 
 		img, _, err := image.Decode(sf)
+		if err != nil {
+			return nil, err
+		}
+		err = r.applyTransColor(img, tile.Tileset.Image.Trans)
 		if err != nil {
 			return nil, err
 		}
