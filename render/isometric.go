@@ -24,28 +24,37 @@ package render
 
 import (
 	"image"
+	"log"
 
 	"github.com/disintegration/imaging"
 	tiled "github.com/lafriks/go-tiled"
 )
 
-// OrthogonalRendererEngine represents orthogonal rendering engine.
-type OrthogonalRendererEngine struct {
+// IsometricRendererEngine represents isometric rendering engine.
+type IsometricRendererEngine struct {
 	m *tiled.Map
 }
 
 // Init initializes rendering engine with provided map options.
-func (e *OrthogonalRendererEngine) Init(m *tiled.Map) {
+func (e *IsometricRendererEngine) Init(m *tiled.Map) {
 	e.m = m
 }
 
 // GetFinalImageSize returns final image size based on map data.
-func (e *OrthogonalRendererEngine) GetFinalImageSize() image.Rectangle {
-	return image.Rect(0, 0, e.m.Width*e.m.TileWidth, e.m.Height*e.m.TileHeight)
+func (e *IsometricRendererEngine) GetFinalImageSize() image.Rectangle {
+	mh := float64(e.m.Height)
+	mw := float64(e.m.Width)
+	th2 := float64(e.m.TileHeight) / 2
+	tw2 := float64(e.m.TileWidth) / 2
+	// max cartesian image size from isometric dimensions
+	h := int(th2 * (mh + mw))
+	w := int(tw2 * (mh + mw))
+	log.Println("Getting final image size for", e.m)
+	return image.Rect(0, 0, w, h)
 }
 
 // RotateTileImage rotates provided tile layer.
-func (e *OrthogonalRendererEngine) RotateTileImage(tile *tiled.LayerTile, img image.Image) image.Image {
+func (e *IsometricRendererEngine) RotateTileImage(tile *tiled.LayerTile, img image.Image) image.Image {
 	timg := img
 	if tile.DiagonalFlip {
 		timg = imaging.FlipH(imaging.Rotate270(timg))
@@ -61,9 +70,14 @@ func (e *OrthogonalRendererEngine) RotateTileImage(tile *tiled.LayerTile, img im
 }
 
 // GetTilePosition returns tile position in image.
-func (e *OrthogonalRendererEngine) GetTilePosition(x, y int, tile *tiled.LayerTile) image.Rectangle {
-	return image.Rect(x*e.m.TileWidth,
-		y*e.m.TileHeight,
-		(x+1)*e.m.TileWidth,
-		(y+1)*e.m.TileHeight)
+func (e *IsometricRendererEngine) GetTilePosition(x, y int, tile *tiled.LayerTile) image.Rectangle {
+	fx := float64(x)
+	fy := float64(y)
+	th2 := float64(e.m.TileHeight) / 2
+	tw2 := float64(e.m.TileWidth) / 2
+	ix := int(tw2*(fx-fy)) + int(tw2)*(e.m.Height-1)
+	iy := int(th2 * (fx + fy))
+	return image.Rect(ix, iy,
+		ix+tile.Tileset.TileWidth,
+		iy+tile.Tileset.TileHeight)
 }
