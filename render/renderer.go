@@ -47,6 +47,9 @@ var (
 
 	// ErrOutOfBounds represents an error that the index is out of bounds
 	ErrOutOfBounds = errors.New("tiled/render: index out of bounds")
+
+	// ErrUnsupportedImgFormat represents an error due to an incompatible image
+	ErrUnsupportedImgFormat = errors.New("tiled/render: unsupported image format")
 )
 
 // RendererEngine is the interface implemented by objects that provide rendering engine for Tiled maps.
@@ -54,7 +57,7 @@ type RendererEngine interface {
 	Init(m *tiled.Map)
 	GetFinalImageSize() image.Rectangle
 	RotateTileImage(tile *tiled.LayerTile, img image.Image) image.Image
-	GetTilePosition(x, y int) image.Rectangle
+	GetTilePosition(x, y int, tile *tiled.LayerTile) image.Rectangle
 }
 
 // Renderer represents an rendering engine.
@@ -76,6 +79,8 @@ func NewRendererWithFileSystem(m *tiled.Map, fs fs.FS) (*Renderer, error) {
 	r := &Renderer{m: m, tileCache: make(map[uint32]image.Image), fs: fs}
 	if r.m.Orientation == "orthogonal" {
 		r.engine = &OrthogonalRendererEngine{}
+	} else if r.m.Orientation == "isometric" {
+		r.engine = &IsometricRendererEngine{}
 	} else {
 		return nil, ErrUnsupportedOrientation
 	}
@@ -164,7 +169,7 @@ func (r *Renderer) _renderLayer(layer *tiled.Layer) error {
 				return err
 			}
 
-			pos := r.engine.GetTilePosition(x, y)
+			pos := r.engine.GetTilePosition(x, y, layer.Tiles[i])
 
 			if layer.Opacity < 1 {
 				mask := image.NewUniform(color.Alpha{uint8(layer.Opacity * 255)})
